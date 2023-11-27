@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
         <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-        <ProjectGuid>{11C09ECE-47C9-4727-BF4E-6D1F9D409A88}</ProjectGuid>
+        <ProjectGuid>{E76C854A-EB63-4761-A275-7216F07F5053}</ProjectGuid>
         <OutputType>Library</OutputType>
         <AppDesignerFolder>Properties</AppDesignerFolder>
         <RootNamespace>DebugToolbox</RootNamespace>
@@ -33,7 +33,7 @@
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="ModClass.cs" />
-        <Compile Include="Properties\AssemblyInfo.cs"/>
+        <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
     <ItemGroup>
       <Content Include="default_config.json" />
