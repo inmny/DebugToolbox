@@ -6,10 +6,11 @@
         <ProjectGuid>{11C09ECE-47C9-4727-BF4E-6D1F9D409A88}</ProjectGuid>
         <OutputType>Library</OutputType>
         <AppDesignerFolder>Properties</AppDesignerFolder>
-        <RootNamespace>ModTemplate</RootNamespace>
-        <AssemblyName>ModTemplate</AssemblyName>
+        <RootNamespace>DebugToolbox</RootNamespace>
+        <AssemblyName>DebugToolbox</AssemblyName>
         <FileAlignment>512</FileAlignment>
         <TargetFramework>net48</TargetFramework>
+        <LangVersion>11</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -42,6 +43,9 @@
       <Content Include="mod.json" />
     </ItemGroup>
     <ItemGroup>
+      <Reference Include="0Harmony">
+        <HintPath>..\..\worldbox_Data\StreamingAssets\mods\NML\Assemblies\0Harmony.dll</HintPath>
+      </Reference>
       <Reference Include="Assembly-CSharp">
         <HintPath>..\..\worldbox_Data\Managed\Assembly-CSharp.dll</HintPath>
       </Reference>

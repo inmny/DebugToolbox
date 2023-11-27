@@ -1,16 +1,36 @@
-﻿using NeoModLoader.api;
+﻿using System;
+using System.Reflection;
+using DebugToolbox.Patches;
+using NeoModLoader.api;
 
-namespace CHANGEME
+namespace DebugToolbox
 {
     public class ModClass : BasicMod<ModClass>
     {
         protected override void OnModLoad()
         {
-            // Load your mod here
-            // 加载你的mod内容
-            
-            // LogInfo(GetConfig()["Default"]["WhatToSay"].TextVal); // Call this only then you confirm it is a text config item
-            LogInfo(GetConfig()["Default"]["WhatToSay"].GetValue() as string);
+            create_all_patches();
+            DictionaryPatch<string,string>.SelfPatch();
+        }
+
+        private void create_all_patches()
+        {
+            Type[] types = Assembly.GetExecutingAssembly().GetTypes();
+            foreach(var type in types)
+            {
+                if(type.Namespace == "DebugToolbox.Patches")
+                {
+                    try
+                    {
+                        type.GetMethod("SelfPatch").Invoke(null, new object[0]);
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                        continue;
+                    }
+                }
+            }
         }
     }
 }
