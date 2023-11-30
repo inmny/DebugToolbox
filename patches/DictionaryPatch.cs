@@ -1,10 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using DebugToolbox.utils;
 using HarmonyLib;
 
 namespace DebugToolbox.Patches
 {
-    public static class DictionaryPatch<TKey, TValue>
+    public static class DictionaryPatch<TKey, TValue> where TKey : class
     {
         public static void SelfPatch()
         {
@@ -20,7 +22,13 @@ namespace DebugToolbox.Patches
                 __result = value;
                 return false;
             }
-            throw new KeyNotFoundException($"Key not found: {key}");
+            StringBuilder sb = new StringBuilder();
+            foreach (KeyValuePair<TKey, TValue> pair in __instance)
+            {
+                sb.AppendLine($"\t\"{pair.Key}\"({pair.Key.GetAddress()}) : \"{pair.Value}\"");
+            }
+            
+            throw new KeyNotFoundException($"Key not found: \"{key}\"({key.GetAddress()}) in: \n{sb.ToString()}");
         }
     }
 }
