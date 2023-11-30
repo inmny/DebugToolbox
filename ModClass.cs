@@ -10,7 +10,7 @@ namespace DebugToolbox
         protected override void OnModLoad()
         {
             create_all_patches();
-            DictionaryPatch<string,string>.SelfPatch();
+            DictionaryPatch<object,object>.SelfPatch();
         }
 
         private void create_all_patches()
