@@ -1,3 +1,10 @@
 {
-    "debug": "调试工具"
+    "debug": "调试工具",
+    "job": "job",
+    "id": "id",
+    "hashset": "hashset",
+    "kingdom_hash": "kingdom_hash",
+    "kingdom_id": "kingdom_id",
+    "profession": "profession",
+    "citizen_job": "citizen_job"
 }

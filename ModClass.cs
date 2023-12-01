@@ -1,8 +1,10 @@
 ﻿using System;
+using System.IO;
 using System.Reflection;
 using DebugToolbox.Patches;
 using NeoModLoader.api;
 using NeoModLoader.api.attributes;
+using NeoModLoader.General;
 
 namespace DebugToolbox
 {
@@ -10,6 +12,10 @@ namespace DebugToolbox
     {
         protected override void OnModLoad()
         {
+            Config.isEditor = true;
+            Config.editor_maxim = true;
+            Config.editor_mastef = true;
+            Config.disableLocaleLogs = true;
             create_all_patches();
             DictionaryPatch<object,object>.SelfPatch();
             HotKeys.init();
@@ -38,6 +44,11 @@ namespace DebugToolbox
         public void Reload()
         {
             HotKeys.init();
+            var locale_dir = GetLocaleFilesDirectory(GetDeclaration());
+            foreach(var file in Directory.GetFiles(locale_dir, "*.json")){
+                LM.LoadLocale(Path.GetFileNameWithoutExtension(file), file);
+            }
+            LM.ApplyLocale();
         }
     }
 }
