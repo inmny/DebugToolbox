@@ -28,12 +28,10 @@ internal static class HotKeys
 
         if(ScrollWindow.currentWindows.Count == 0)
         {
-            ModClass.LogInfo($"{ScrollWindow.currentWindows.Count} to clickShow");
             ScrollWindow.get("debug").clickShow();
         }
         else if(ScrollWindow.currentWindows.Contains(ScrollWindow.get("debug")))
         {
-            ModClass.LogInfo($"{ScrollWindow.currentWindows.Count} to clickHide");
             ScrollWindow.get("debug").clickHide();
         }
     }
