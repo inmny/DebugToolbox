@@ -34,7 +34,6 @@
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="ModClass.cs" />
-        <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
     <ItemGroup>
       <Content Include="default_config.json" />
