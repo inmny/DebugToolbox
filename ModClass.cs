@@ -5,17 +5,19 @@ using DebugToolbox.Patches;
 using NeoModLoader.api;
 using NeoModLoader.api.attributes;
 using NeoModLoader.General;
+using NeoModLoader.services;
+using UnityEngine;
 
 namespace DebugToolbox
 {
     public class ModClass : BasicMod<ModClass>, IReloadable
     {
+        public FullExceptionTracker Tracker;
         protected override void OnModLoad()
         {
             Config.isEditor = true;
             Config.editor_maxim = true;
             Config.editor_mastef = true;
-            Config.disableLocaleLogs = true;
             create_all_patches();
             DictionaryPatch<object,object>.SelfPatch();
             HotKeys.init();

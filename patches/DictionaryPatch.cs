@@ -16,6 +16,7 @@ namespace DebugToolbox.Patches
 
         private static bool get_Item_Prefix(Dictionary<TKey, TValue> __instance, ref TValue __result, TKey key)
         {
+            if (key == null) return true;
             if (__instance.TryGetValue(key, out TValue value))
             {
                 __result = value;

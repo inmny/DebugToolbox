@@ -27,14 +27,6 @@ internal static class HotKeys
         {
             DebugConfig.instance.debugButton.SetActive(true);
         }
-
-        if (ScrollWindow.currentWindows.Count == 0)
-        {
-            ScrollWindow.get("debug").clickShow();
-        }
-        else if (ScrollWindow.currentWindows.Contains(ScrollWindow.get("debug")))
-        {
-            ScrollWindow.get("debug").clickHide();
-        }
+        ScrollWindow.get("debug").clickShow();
     }
 }
