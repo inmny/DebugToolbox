@@ -21,6 +21,17 @@ namespace DebugToolbox
             create_all_patches();
             DictionaryPatch<object,object>.SelfPatch();
             HotKeys.init();
+            Tracker = new();
+
+            UnityExplorer.ExplorerStandalone.CreateInstance();
+        }
+
+        private void Update()
+        {
+            foreach (var st in Tracker.exceptions)
+            {
+                LogInfo(st);
+            }
         }
 
         private void create_all_patches()
