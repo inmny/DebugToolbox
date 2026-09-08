@@ -1,0 +1,294 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace DebugToolbox.Client;
+
+internal sealed class McpServer
+{
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private readonly TextReader _input;
+    private readonly TextWriter _output;
+
+    public McpServer(TextReader input, TextWriter output)
+    {
+        _input = input;
+        _output = output;
+    }
+
+    public async Task RunAsync()
+    {
+        string? line;
+        while ((line = await _input.ReadLineAsync()) != null)
+        {
+            JsonObject? request = null;
+            try
+            {
+                request = JsonNode.Parse(line)?.AsObject();
+                if (request == null) continue;
+                var response = await DispatchAsync(request);
+                if (response != null)
+                {
+                    await _output.WriteLineAsync(response.ToJsonString(JsonOptions));
+                    await _output.FlushAsync();
+                }
+            }
+            catch (Exception exception)
+            {
+                var response = ErrorResponse(request?["id"], -32603, exception.Message);
+                await _output.WriteLineAsync(response.ToJsonString(JsonOptions));
+                await _output.FlushAsync();
+            }
+        }
+    }
+
+    private async Task<JsonObject?> DispatchAsync(JsonObject request)
+    {
+        var id = request["id"]?.DeepClone();
+        var method = request["method"]?.GetValue<string>();
+        if (id == null) return null;
+
+        switch (method)
+        {
+            case "initialize":
+                var protocolVersion = request["params"]?["protocolVersion"]?.GetValue<string>() ?? "2025-06-18";
+                return ResultResponse(id, new JsonObject
+                {
+                    ["protocolVersion"] = protocolVersion,
+                    ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
+                    ["serverInfo"] = new JsonObject
+                    {
+                        ["name"] = "DebugToolbox",
+                        ["version"] = "1.0.0"
+                    }
+                });
+            case "ping":
+                return ResultResponse(id, new JsonObject());
+            case "tools/list":
+                return ResultResponse(id, ToolList());
+            case "tools/call":
+                return ResultResponse(id, await CallToolAsync(request["params"]?.AsObject()));
+            default:
+                return ErrorResponse(id, -32601, $"Method not found: {method}");
+        }
+    }
+
+    private static JsonObject ToolList()
+    {
+        return new JsonObject
+        {
+            ["tools"] = new JsonArray
+            {
+                Tool("run_csharp", "Compile and execute unrestricted C# inside WorldBox on the Unity main thread",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["source"] = new JsonObject { ["type"] = "string" },
+                            ["timeoutMs"] = new JsonObject { ["type"] = "integer", ["default"] = 30000 }
+                        },
+                        ["required"] = new JsonArray("source")
+                    }),
+                Tool("read_debug_events", "Read logs, errors and method trace events after a sequence cursor",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["since"] = new JsonObject { ["type"] = "integer", ["default"] = 0 },
+                            ["limit"] = new JsonObject { ["type"] = "integer", ["default"] = 512 }
+                        }
+                    }),
+                Tool("inspect_object", "Inspect fields of an object handle returned by a script",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["handle"] = new JsonObject { ["type"] = "string" },
+                            ["depth"] = new JsonObject { ["type"] = "integer", ["default"] = 1 },
+                            ["includeProperties"] = new JsonObject { ["type"] = "boolean", ["default"] = false }
+                        },
+                        ["required"] = new JsonArray("handle")
+                    }),
+                Tool("get_object_field", "Read one field without compiling a script",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["handle"] = new JsonObject { ["type"] = "string" },
+                            ["field"] = new JsonObject { ["type"] = "string" },
+                            ["depth"] = new JsonObject { ["type"] = "integer", ["default"] = 0 }
+                        },
+                        ["required"] = new JsonArray("handle", "field")
+                    }),
+                Tool("set_object_field", "Write one field without compiling a script",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["handle"] = new JsonObject { ["type"] = "string" },
+                            ["field"] = new JsonObject { ["type"] = "string" },
+                            ["value"] = new JsonObject(),
+                            ["depth"] = new JsonObject { ["type"] = "integer", ["default"] = 0 }
+                        },
+                        ["required"] = new JsonArray("handle", "field", "value")
+                    }),
+                Tool("invoke_object_method", "Invoke one instance method without compiling a script",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["handle"] = new JsonObject { ["type"] = "string" },
+                            ["method"] = new JsonObject { ["type"] = "string" },
+                            ["arguments"] = new JsonObject
+                            {
+                                ["type"] = "array",
+                                ["items"] = new JsonObject()
+                            },
+                            ["parameterTypes"] = StringArraySchema(),
+                            ["depth"] = new JsonObject { ["type"] = "integer", ["default"] = 0 }
+                        },
+                        ["required"] = new JsonArray("handle", "method")
+                    }),
+                Tool("release_object", "Release an object handle from DebugToolbox",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["handle"] = new JsonObject { ["type"] = "string" }
+                        },
+                        ["required"] = new JsonArray("handle")
+                    }),
+                Tool("start_method_trace", "Start tracing a loaded method without compiling a script",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["type"] = new JsonObject { ["type"] = "string" },
+                            ["method"] = new JsonObject { ["type"] = "string" },
+                            ["parameterTypes"] = StringArraySchema(),
+                            ["includeArguments"] = new JsonObject { ["type"] = "boolean", ["default"] = true },
+                            ["includeResult"] = new JsonObject { ["type"] = "boolean", ["default"] = true },
+                            ["includeStackTrace"] = new JsonObject { ["type"] = "boolean", ["default"] = false },
+                            ["maxEvents"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["default"] = 512 }
+                        },
+                        ["required"] = new JsonArray("type", "method")
+                    }),
+                Tool("read_method_trace", "Read events captured by a method trace",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["traceId"] = new JsonObject { ["type"] = "string" }
+                        },
+                        ["required"] = new JsonArray("traceId")
+                    }),
+                Tool("stop_method_trace", "Stop a method trace and return its final events",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["traceId"] = new JsonObject { ["type"] = "string" }
+                        },
+                        ["required"] = new JsonArray("traceId")
+                    }),
+                Tool("runtime_stats", "Report script assembly, symbol, handle and process memory statistics",
+                    new JsonObject { ["type"] = "object" }),
+                Tool("debug_session", "Read DebugToolbox runtime capabilities and current frame",
+                    new JsonObject { ["type"] = "object" })
+            }
+        };
+    }
+
+    private static JsonObject StringArraySchema()
+    {
+        return new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject { ["type"] = "string" }
+        };
+    }
+
+    private static JsonObject Tool(string name, string description, JsonObject schema)
+    {
+        return new JsonObject
+        {
+            ["name"] = name,
+            ["description"] = description,
+            ["inputSchema"] = schema
+        };
+    }
+
+    private static async Task<JsonObject> CallToolAsync(JsonObject? parameters)
+    {
+        var name = parameters?["name"]?.GetValue<string>() ?? throw new ArgumentException("Missing tool name");
+        var arguments = parameters?["arguments"]?.AsObject() ?? new JsonObject();
+
+        try
+        {
+            var client = new RpcClient();
+            JsonNode? result = name switch
+            {
+                "run_csharp" => await client.CallAsync("script.run", arguments),
+                "read_debug_events" => await client.CallAsync("events.read", arguments),
+                "inspect_object" => await client.CallAsync("objects.inspect", arguments),
+                "get_object_field" => await client.CallAsync("objects.get_field", arguments),
+                "set_object_field" => await client.CallAsync("objects.set_field", arguments),
+                "invoke_object_method" => await client.CallAsync("objects.invoke", arguments),
+                "release_object" => await client.CallAsync("objects.release", arguments),
+                "start_method_trace" => await client.CallAsync("trace.start", arguments),
+                "read_method_trace" => await client.CallAsync("trace.read", arguments),
+                "stop_method_trace" => await client.CallAsync("trace.stop", arguments),
+                "runtime_stats" => await client.CallAsync("runtime.stats", arguments),
+                "debug_session" => await client.CallAsync("hello"),
+                _ => throw new MissingMethodException($"Unknown tool: {name}")
+            };
+            return ToolResult(result, false);
+        }
+        catch (Exception exception)
+        {
+            return ToolResult(JsonValue.Create(exception.Message), true);
+        }
+    }
+
+    private static JsonObject ToolResult(JsonNode? result, bool isError)
+    {
+        var text = result?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "null";
+        return new JsonObject
+        {
+            ["content"] = new JsonArray
+            {
+                new JsonObject { ["type"] = "text", ["text"] = text }
+            },
+            ["isError"] = isError
+        };
+    }
+
+    private static JsonObject ResultResponse(JsonNode id, JsonNode result)
+    {
+        return new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id,
+            ["result"] = result
+        };
+    }
+
+    private static JsonObject ErrorResponse(JsonNode? id, int code, string message)
+    {
+        return new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id?.DeepClone(),
+            ["error"] = new JsonObject { ["code"] = code, ["message"] = message }
+        };
+    }
+}

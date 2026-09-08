@@ -1,0 +1,59 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace DebugToolbox.Client;
+
+internal sealed class RpcClient
+{
+    private sealed class SessionInfo
+    {
+        public int Port { get; set; }
+        public string Token { get; set; } = string.Empty;
+    }
+
+    private readonly SessionInfo _session;
+
+    public RpcClient()
+    {
+        var sessionFile = Path.Combine(Path.GetTempPath(), "DebugToolbox", "session.json");
+        if (!File.Exists(sessionFile))
+        {
+            throw new FileNotFoundException("DebugToolbox is not running or has not created a session", sessionFile);
+        }
+
+        _session = JsonSerializer.Deserialize<SessionInfo>(
+            File.ReadAllText(sessionFile),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidDataException("Invalid DebugToolbox session file");
+    }
+
+    public async Task<JsonNode?> CallAsync(string method, JsonObject? parameters = null)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, _session.Port);
+        await using var stream = client.GetStream();
+        using var reader = new StreamReader(stream, new UTF8Encoding(false), false, 4096, true);
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, true) { AutoFlush = true };
+
+        var request = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["token"] = _session.Token,
+            ["method"] = method,
+            ["params"] = parameters?.DeepClone() ?? new JsonObject()
+        };
+        await writer.WriteLineAsync(request.ToJsonString());
+
+        var line = await reader.ReadLineAsync();
+        if (line == null) throw new IOException("DebugToolbox closed the connection without a response");
+        var response = JsonNode.Parse(line)?.AsObject() ?? throw new InvalidDataException("Invalid DebugToolbox response");
+        if (response["error"] != null)
+        {
+            throw new InvalidOperationException(response["error"]!.ToJsonString());
+        }
+        return response["result"]?.DeepClone();
+    }
+}

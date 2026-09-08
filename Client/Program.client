@@ -1,0 +1,76 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using DebugToolbox.Client;
+
+if (args.Length == 0)
+{
+    Console.Error.WriteLine("Usage: DebugToolbox.Client <mcp|hello|run|eval|events|inspect|stats>");
+    return 2;
+}
+
+if (args[0] == "mcp")
+{
+    await new McpServer(Console.In, Console.Out).RunAsync();
+    return 0;
+}
+
+try
+{
+    var client = new RpcClient();
+    JsonNode? result;
+    switch (args[0])
+    {
+        case "hello":
+            result = await client.CallAsync("hello");
+            break;
+        case "run":
+            if (args.Length < 2) throw new ArgumentException("run requires a .csx file path");
+            result = await client.CallAsync("script.run", new JsonObject
+            {
+                ["source"] = await File.ReadAllTextAsync(args[1]),
+                ["timeoutMs"] = ReadTimeout(args, 2)
+            });
+            break;
+        case "eval":
+            if (args.Length < 2) throw new ArgumentException("eval requires C# source");
+            result = await client.CallAsync("script.run", new JsonObject
+            {
+                ["source"] = string.Join(' ', args.Skip(1)),
+                ["timeoutMs"] = 30000
+            });
+            break;
+        case "events":
+            result = await client.CallAsync("events.read", new JsonObject
+            {
+                ["since"] = args.Length > 1 ? long.Parse(args[1]) : 0,
+                ["limit"] = args.Length > 2 ? int.Parse(args[2]) : 512
+            });
+            break;
+        case "inspect":
+            if (args.Length < 2) throw new ArgumentException("inspect requires an object handle");
+            result = await client.CallAsync("objects.inspect", new JsonObject
+            {
+                ["handle"] = args[1],
+                ["depth"] = args.Length > 2 ? int.Parse(args[2]) : 1
+            });
+            break;
+        case "stats":
+            result = await client.CallAsync("runtime.stats");
+            break;
+        default:
+            throw new ArgumentException($"Unknown command: {args[0]}");
+    }
+
+    Console.WriteLine(result?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "null");
+    return 0;
+}
+catch (Exception exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    return 1;
+}
+
+static int ReadTimeout(string[] arguments, int index)
+{
+    return arguments.Length > index ? int.Parse(arguments[index]) : 30000;
+}

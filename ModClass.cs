@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reflection;
 using DebugToolbox.Patches;
+using DebugToolbox.Runtime;
 using NeoModLoader.api;
 using NeoModLoader.api.attributes;
 using NeoModLoader.General;
@@ -13,6 +14,7 @@ namespace DebugToolbox
     public class ModClass : BasicMod<ModClass>, IReloadable
     {
         public FullExceptionTracker Tracker;
+        private DebugRuntime _runtime;
         protected override void OnModLoad()
         {
             Config.isEditor = true;
@@ -21,17 +23,17 @@ namespace DebugToolbox
             create_all_patches();
             DictionaryPatch<object,object>.SelfPatch();
             HotKeys.init();
-            Tracker = new();
+            _runtime = DebugRuntime.Start();
+            Tracker = new FullExceptionTracker(_runtime.Events, _runtime.Sources);
+            LogInfo($"AI script endpoint: 127.0.0.1:{_runtime.Server.Port}");
+            LogInfo($"AI script session: {_runtime.Server.SessionFile}");
 
             UnityExplorer.ExplorerStandalone.CreateInstance();
         }
 
         private void Update()
         {
-            foreach (var st in Tracker.exceptions)
-            {
-                LogInfo(st);
-            }
+            _runtime?.Update();
         }
 
         private void create_all_patches()
